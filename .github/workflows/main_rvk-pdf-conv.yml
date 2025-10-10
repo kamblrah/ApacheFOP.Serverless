@@ -18,29 +18,36 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
 
-      # Install Node (needed for Core Tools via npm)
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # Install Azure Functions Core Tools v4 on the runner
       - name: Install Azure Functions Core Tools v4
         run: npm i -g azure-functions-core-tools@4 --unsafe-perm true
 
       - name: Build with Maven
         working-directory: ${{ env.POM_XML_DIRECTORY }}
         run: mvn -B -ntp clean package
+
+      - name: List build output
+        working-directory: ${{ env.POM_XML_DIRECTORY }}
+        run: |
+          ls -la
+          ls -la target || true
+          ls -la target/azure-functions || true
+
+      - name: Capture package path
+        id: pkg
+        working-directory: ${{ env.POM_XML_DIRECTORY }}
+        run: echo "PKG=$(ls -d target/azure-functions/* | head -n 1)" >> $GITHUB_OUTPUT
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
@@ -53,4 +60,4 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: ${{ env.POM_XML_DIRECTORY }}/target/azure-functions/${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ steps.pkg.outputs.PKG }}
