@@ -28,6 +28,16 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
 
+      # Install Node (needed for Core Tools via npm)
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Install Azure Functions Core Tools v4 on the runner
+      - name: Install Azure Functions Core Tools v4
+        run: npm i -g azure-functions-core-tools@4 --unsafe-perm true
+
       - name: Build with Maven
         working-directory: ${{ env.POM_XML_DIRECTORY }}
         run: mvn -B -ntp clean package
@@ -43,5 +53,4 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          # No slot-name -> defaults to production
           package: ${{ env.POM_XML_DIRECTORY }}/target/azure-functions/${{ env.AZURE_FUNCTIONAPP_NAME }}
