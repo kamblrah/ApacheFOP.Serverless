@@ -72,6 +72,7 @@ jobs:
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-          package: ${{ steps.pkg.outputs.PKG }}
+          app-name: rvk-pdf-conv
+          package: apachefop-serverless-az-func/target/azure-functions/rvk-pdf-conv
+
 
