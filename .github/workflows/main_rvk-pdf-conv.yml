@@ -48,7 +48,22 @@ jobs:
         id: pkg
         working-directory: ${{ env.POM_XML_DIRECTORY }}
         run: echo "PKG=$(ls -d target/azure-functions/* | head -n 1)" >> $GITHUB_OUTPUT
+        
+      - name: List build output
+        working-directory: ${{ env.POM_XML_DIRECTORY }}
+        run: |
+          ls -la
+          ls -la target || true
+          ls -la target/azure-functions || true
 
+      - name: Capture package path
+        id: pkg
+        working-directory: ${{ env.POM_XML_DIRECTORY }}
+        run: |
+          PKG_DIR=$(ls -d target/azure-functions/* | head -n 1)
+          echo "Detected package: $PKG_DIR"
+          echo "PKG=$PKG_DIR" >> $GITHUB_OUTPUT
+          
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -61,3 +76,4 @@ jobs:
         with:
           app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
           package: ${{ steps.pkg.outputs.PKG }}
+
