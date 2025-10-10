@@ -78,7 +78,7 @@
             <plugin>
                 <groupId>com.microsoft.azure</groupId>
                 <artifactId>azure-functions-maven-plugin</artifactId>
-                <version>1.38.0</version>
+                <version>1.39.0</version>
                 <configuration>
                     <!-- The App Name & Resource Group Name must both be Unique or deployment issues may arise
                             as NOTED here: https://github.com/Azure/azure-functions-java-worker/issues/140 -->
@@ -94,7 +94,7 @@
                     <!-- <pricingTier></pricingTier> -->
 
                     <!-- Whether to disable application insights, default is false -->
-                    <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details for all valid configurations for application insights-->
+                    <!-- refers https://github.com/microsoft/azure-maven-plugins/wiki/Azure-Functions:-Configuration-Details for all configurations for application insights-->
                     <!-- <disableAppInsights></disableAppInsights> -->
                     <runtime>
                         <!-- runtime os, could be windows, linux or docker-->
