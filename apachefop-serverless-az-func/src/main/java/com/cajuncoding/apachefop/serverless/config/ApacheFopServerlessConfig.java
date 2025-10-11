@@ -21,6 +21,12 @@ public class ApacheFopServerlessConfig {
     private boolean eventLogDumpModeEnabled = false;
     private boolean accessibilityPdfRenderingEnabled = false;
     private int maxHeaderBytesSize = 4096;
+    
+    //XSLT Configuration Settings...
+    private boolean xsltCacheEnabled = true;
+    private int xsltCacheSize = 64;
+    private long xsltMaxXmlSizeBytes = 10 * 1024 * 1024; // 10MB default
+    private long xsltMaxXsltSizeBytes = 5 * 1024 * 1024; // 5MB default
 
     public ApacheFopServerlessConfig() {
         this(null, null);
@@ -53,6 +59,12 @@ public class ApacheFopServerlessConfig {
         //NOTE: If the accessibility configuration is used (e.g. <pdf-ua-mode>PDF/UA-1</pdf-ua-mode>) is used then this
         //      configuration must be enabled or the PDF rendering will return an error stating that accessibility must be enabled!
         this.accessibilityPdfRenderingEnabled = getConfigAsBooleanOrDefault("AccessibilityEnabled", false);
+
+        //XSLT Configuration Settings...
+        this.xsltCacheEnabled = getConfigAsBooleanOrDefault("XsltCacheEnabled", true);
+        this.xsltCacheSize = getConfigAsIntOrDefault("XsltCacheSize", 64);
+        this.xsltMaxXmlSizeBytes = getConfigAsLongOrDefault("XsltMaxXmlSizeBytes", 10 * 1024 * 1024L);
+        this.xsltMaxXsltSizeBytes = getConfigAsLongOrDefault("XsltMaxXsltSizeBytes", 5 * 1024 * 1024L);
     }
 
     protected void readRequestHeadersConfig(Map<String, String> headers) {
@@ -109,6 +121,17 @@ public class ApacheFopServerlessConfig {
     public int getMaxHeaderBytesSize() { return maxHeaderBytesSize; }
 
     //****************************************************************
+    //XSLT Configuration Settings...
+    //****************************************************************
+    public boolean isXsltCacheEnabled() { return xsltCacheEnabled; }
+
+    public int getXsltCacheSize() { return xsltCacheSize; }
+
+    public long getXsltMaxXmlSizeBytes() { return xsltMaxXmlSizeBytes; }
+
+    public long getXsltMaxXsltSizeBytes() { return xsltMaxXsltSizeBytes; }
+
+    //****************************************************************
     //Azure Function Configuration Settings...
     //****************************************************************
     public boolean isGzipRequestEnabled() { return isGzipRequestEnabled; }
@@ -143,5 +166,29 @@ public class ApacheFopServerlessConfig {
         return StringUtils.isBlank(value)
             ? defaultValue
             : BooleanUtils.toBoolean(value);
+    }
+
+    private int getConfigAsIntOrDefault(String name, int defaultValue) {
+        String value = getConfigValue(name);
+        if (StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private long getConfigAsLongOrDefault(String name, long defaultValue) {
+        String value = getConfigValue(name);
+        if (StringUtils.isBlank(value)) {
+            return defaultValue;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }

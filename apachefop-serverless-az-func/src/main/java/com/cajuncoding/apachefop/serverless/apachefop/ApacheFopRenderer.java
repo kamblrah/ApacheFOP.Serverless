@@ -49,6 +49,13 @@ public class ApacheFopRenderer {
         initApacheFopFactorySafely();
     }
 
+    /**
+     * Get the static FopFactory instance.
+     */
+    public static FopFactory getFopFactory() {
+        return staticFopFactory;
+    }
+
     public ApacheFopRenderResult renderPdfResult(String xslFOSource, boolean gzipEnabled) throws IOException, TransformerException, FOPException {
         //We want to manage the output in memory to eliminate any overhead or risks of using the file-system
         //  (e.g. file cleanup, I/O issues, etc.).
