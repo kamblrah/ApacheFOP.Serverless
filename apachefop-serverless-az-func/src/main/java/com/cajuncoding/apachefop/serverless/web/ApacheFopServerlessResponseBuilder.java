@@ -116,4 +116,29 @@ public class ApacheFopServerlessResponseBuilder<TRequest> {
 
         return new SafeHeader(resultValue, resultEncoding);
     }
+
+    public HttpResponseMessage buildXsltPdfResponse(
+            byte[] pdfBytes,
+            ApacheFopServerlessConfig config
+    ) throws IOException {
+        
+        //Lets create a unique filename -- because that's helpful to the client...
+        String fileName = TextUtils.getCurrentW3cDateTime().concat("_XsltRenderedPdf.pdf");
+
+        String contentEncoding = config.isGzipResponseEnabled()
+                ? HttpEncodings.GZIP_ENCODING
+                : HttpEncodings.IDENTITY_ENCODING;
+
+        //Build the Http Response for the Client!
+        HttpResponseMessage response = request
+                .createResponseBuilder(HttpStatus.OK)
+                .body(pdfBytes)
+                .header(HttpHeaders.CONTENT_TYPE, MimeConstants.MIME_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, MessageFormat.format("inline; filename=\"{0}\"", fileName))
+                //If GZIP is enabled then specify the proper encoding in the HttpResponse!
+                .header(HttpHeaders.CONTENT_ENCODING, contentEncoding)
+                .build();
+
+        return response;
+    }
 }
