@@ -18,6 +18,17 @@ then I do love-me-some-coffee!*
 
 ## Updates / Change Log
 
+##### Updated the project to v1.7 with the following:
+- **NEW! XML + XSLT Transformation Endpoint**: Added `/api/apache-fop/xslt` endpoint that accepts XML data and XSLT stylesheet, transforms server-side to XSL-FO, and renders to PDF.
+  - **XSLT Caching**: Compiled stylesheets are cached with SHA-256 hash keys and LRU eviction for optimal performance.
+  - **Security Hardening**: External entity resolution disabled, DTD and external stylesheet imports blocked to prevent XXE attacks.
+  - **XSLT Parameters**: Support for passing dynamic parameters to stylesheets.
+  - **Size Limits**: Configurable maximum sizes for XML (default 10MB) and XSLT (default 5MB) to prevent abuse.
+  - **Error Handling**: Comprehensive JSON error responses with specific error codes for debugging.
+  - **Configuration**: New environment variables `XsltCacheEnabled`, `XsltCacheSize`, `XsltMaxXmlSizeBytes`, `XsltMaxXsltSizeBytes`.
+- Added Jackson JSON library for JSON request/response handling.
+- Fixed Java version temporarily set to 17 for compatibility with build environment.
+
 ##### Updated the project to v1.6 with the following:
 - Updated Apache FOP to v2.11 (latest as of 2025-05-20).
 - Update to now use Java Azure Functions v4 (v3 is fully deprecated by end of 2022).
@@ -87,6 +98,47 @@ If an error occurs -- likely due to incorrect Xsl-FO syntax or structure -- then
  - Request Type: **POST**
  - Request Body: **Xsl-FO Content as valid Xml** to Render
 
+#### NEW! XML + XSLT Transformation Endpoint:
+Transform XML data with XSLT stylesheet to PDF in one step! The service performs server-side XSLT transformation to XSL-FO, then renders to PDF.
+
+ - Path: **`/api/apache-fop/xslt`**
+ - Request Type: **POST**
+ - Content-Type: **`application/json`**
+ - Request Body (JSON):
+   ```json
+   {
+     "xml": "<root>Your XML data here</root>",
+     "xslt": "<xsl:stylesheet version='1.0' ...>Your XSLT stylesheet here</xsl:stylesheet>",
+     "parameters": {
+       "param1": "value1",
+       "param2": "value2"
+     }
+   }
+   ```
+
+**Features:**
+- **XSLT Caching**: Compiled stylesheets are cached (SHA-256 hash key) with LRU eviction for optimal performance
+- **Security Hardening**: External entity resolution disabled, DTD and external stylesheet imports blocked
+- **XSLT Parameters**: Pass dynamic parameters to your stylesheets
+- **Size Limits**: Configurable max sizes for XML and XSLT (defaults: 10MB XML, 5MB XSLT)
+- **GZIP Support**: Accepts gzip-encoded responses via `Accept-Encoding: gzip` header
+
+**Configuration (Environment Variables):**
+- `XsltCacheEnabled` - Enable/disable stylesheet caching (default: `true`)
+- `XsltCacheSize` - Max cached stylesheets (default: `64`)
+- `XsltMaxXmlSizeBytes` - Max XML size in bytes (default: `10485760` = 10MB)
+- `XsltMaxXsltSizeBytes` - Max XSLT size in bytes (default: `5242880` = 5MB)
+
+**Error Responses (400 Bad Request):**
+```json
+{
+  "error": "InvalidXslt",
+  "message": "Failed to compile XSLT: ..."
+}
+```
+
+Common error codes: `MissingBody`, `InvalidJson`, `MissingXml`, `MissingXslt`, `InvalidXslt`, `XmlSizeExceeded`, `XsltSizeExceeded`, `TransformationError`, `PdfRenderError`
+
 #### Responses:
  - **Http 200-OK**: *Binary File paylaod containing the rendered Pdf File*
  - **Http 500-InternalServerError** -- *Json response payload with ApacheFOP processing error details.*
@@ -94,6 +146,32 @@ If an error occurs -- likely due to incorrect Xsl-FO syntax or structure -- then
 
 #### Postman Example:
 <p align="center"><img src="/postman-test-fonts-fo.png" width="750px"></p>
+
+#### XSLT Endpoint CURL Example:
+```bash
+# Simple XSLT transformation
+curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
+  -H "Content-Type: application/json" \
+  -H "Accept-Encoding: gzip" \
+  -d '{
+    "xml": "<?xml version=\"1.0\"?><document><title>Test</title><content>Hello World</content></document>",
+    "xslt": "<?xml version=\"1.0\"?><xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:fo=\"http://www.w3.org/1999/XSL/Format\"><xsl:template match=\"/\"><fo:root><fo:layout-master-set><fo:simple-page-master master-name=\"A4\" page-width=\"210mm\" page-height=\"297mm\" margin=\"20mm\"><fo:region-body/></fo:simple-page-master></fo:layout-master-set><fo:page-sequence master-reference=\"A4\"><fo:flow flow-name=\"xsl-region-body\"><fo:block font-size=\"16pt\" font-weight=\"bold\"><xsl:value-of select=\"document/title\"/></fo:block><fo:block margin-top=\"10pt\"><xsl:value-of select=\"document/content\"/></fo:block></fo:flow></fo:page-sequence></fo:root></xsl:template></xsl:stylesheet>"
+  }' \
+  --output output.pdf
+
+# With XSLT parameters
+curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "xml": "<data><value>123</value></data>",
+    "xslt": "...",
+    "parameters": {
+      "title": "My Report",
+      "date": "2025-10-11"
+    }
+  }' \
+  --output report.pdf
+```
 
 ## Project Overview:
 Generating high quality printable PDF outputs from a highly flexible [pdf templating approach (separating content/data from presentation)](https://github.com/cajuncoding/PdfTemplating.XslFO) hasn't been easy in the world of .NET -- vs the world of Java where ApacheFOP has been around for a very long time.
