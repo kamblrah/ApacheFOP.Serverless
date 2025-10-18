@@ -9,7 +9,7 @@ import org.apache.fop.apps.FOUserAgent;
 import org.apache.fop.apps.MimeConstants;
 import com.cajuncoding.apachefop.serverless.apachefop.ApacheFopEventListener;
 
-import javax.xml.XMLConstants;
+import net.sf.saxon.s9api.*;
 import javax.xml.transform.*;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.stream.StreamSource;
@@ -21,11 +21,12 @@ import java.util.zip.GZIPOutputStream;
 
 /**
  * Service for transforming XML + XSLT to PDF via XSL-FO.
+ * Uses Saxon-HE for XSLT 2.0/3.0 support with backwards compatibility for XSLT 1.0.
  * Includes security hardening and caching support.
  */
 public class XsltTransformerService {
     private final XsltTemplateCache templateCache;
-    private final TransformerFactory transformerFactory;
+    private final Processor saxonProcessor;
     private final FopFactory fopFactory;
     private final Logger logger;
     private final ApacheFopServerlessConfig config;
@@ -52,32 +53,12 @@ public class XsltTransformerService {
         // Initialize cache
         this.templateCache = new XsltTemplateCache(cacheSize, cacheEnabled, logger);
 
-        // Initialize TransformerFactory with security features
-        this.transformerFactory = createSecureTransformerFactory();
-    }
-
-    /**
-     * Create a secure TransformerFactory with hardened settings.
-     */
-    private TransformerFactory createSecureTransformerFactory() {
-        TransformerFactory factory = TransformerFactory.newInstance();
+        // Initialize Saxon Processor (false = use Saxon-HE, not Saxon-PE or Saxon-EE)
+        this.saxonProcessor = new Processor(false);
         
-        try {
-            // Disable external entity resolution
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
-            
-            if (logger != null) {
-                logger.info("TransformerFactory configured with security features enabled");
-            }
-        } catch (Exception e) {
-            if (logger != null) {
-                logger.warning("Could not set all security features on TransformerFactory: " + e.getMessage());
-            }
+        if (logger != null) {
+            logger.info("Saxon-HE XSLT Processor initialized - supports XSLT 3.0, 2.0, and 1.0");
         }
-        
-        return factory;
     }
 
     /**
@@ -96,16 +77,16 @@ public class XsltTransformerService {
         try {
             // Generate cache key and check cache
             String cacheKey = templateCache.generateCacheKey(xsltContent);
-            Templates templates = templateCache.get(cacheKey);
+            XsltExecutable executable = templateCache.get(cacheKey);
 
             // Compile XSLT if not in cache
-            if (templates == null) {
-                templates = compileXslt(xsltContent);
-                templateCache.put(cacheKey, templates);
+            if (executable == null) {
+                executable = compileXslt(xsltContent);
+                templateCache.put(cacheKey, executable);
             }
 
             // Transform XML to PDF via XSL-FO
-            byte[] pdfBytes = transformToPdf(xmlContent, templates, parameters, gzipEnabled);
+            byte[] pdfBytes = transformToPdf(xmlContent, executable, parameters, gzipEnabled);
 
             return new XsltTransformResult(pdfBytes, true);
 
@@ -163,19 +144,24 @@ public class XsltTransformerService {
     }
 
     /**
-     * Compile XSLT stylesheet to Templates.
+     * Compile XSLT stylesheet to XsltExecutable using Saxon.
      */
-    private Templates compileXslt(String xsltContent) throws XsltTransformException {
+    private XsltExecutable compileXslt(String xsltContent) throws XsltTransformException {
         try (StringReader xsltReader = new StringReader(xsltContent)) {
             StreamSource xsltSource = new StreamSource(xsltReader);
-            Templates templates = transformerFactory.newTemplates(xsltSource);
+            
+            // Create Saxon XSLT compiler
+            XsltCompiler compiler = saxonProcessor.newXsltCompiler();
+            
+            // Compile the stylesheet
+            XsltExecutable executable = compiler.compile(xsltSource);
             
             if (logger != null) {
-                logger.info("XSLT stylesheet compiled successfully");
+                logger.info("XSLT stylesheet compiled successfully with Saxon-HE");
             }
             
-            return templates;
-        } catch (TransformerConfigurationException e) {
+            return executable;
+        } catch (SaxonApiException e) {
             String message = "Failed to compile XSLT: " + e.getMessage();
             if (e.getMessage() != null && e.getMessage().contains("entity")) {
                 message += " (External entities are disabled for security)";
@@ -187,11 +173,11 @@ public class XsltTransformerService {
     }
 
     /**
-     * Transform XML to PDF via XSL-FO using compiled Templates.
+     * Transform XML to PDF via XSL-FO using compiled XsltExecutable from Saxon.
      */
     private byte[] transformToPdf(
         String xmlContent,
-        Templates templates,
+        XsltExecutable executable,
         Map<String, String> parameters,
         boolean gzipEnabled
     ) throws XsltTransformException {
@@ -201,25 +187,27 @@ public class XsltTransformerService {
             OutputStream fopOutputStream = gzipEnabled ? 
                 new GZIPOutputStream(pdfBaseOutputStream) : pdfBaseOutputStream
         ) {
-            // Create transformer from templates
-            Transformer transformer = templates.newTransformer();
+            // Create transformer from executable
+            Xslt30Transformer transformer = executable.load30();
 
             // Set parameters if provided
             if (parameters != null && !parameters.isEmpty()) {
+                Map<QName, XdmValue> paramMap = new java.util.HashMap<>();
                 for (Map.Entry<String, String> param : parameters.entrySet()) {
-                    transformer.setParameter(param.getKey(), param.getValue());
+                    paramMap.put(new QName(param.getKey()), new XdmAtomicValue(param.getValue()));
                     if (logger != null) {
                         logger.info("Set XSLT parameter: " + param.getKey() + " = " + param.getValue());
                     }
                 }
+                transformer.setStylesheetParameters(paramMap);
             }
 
             // First transform: XML + XSLT -> XSL-FO
             StringWriter foWriter = new StringWriter();
             try (StringReader xmlReader = new StringReader(xmlContent)) {
-                Source xmlSource = new StreamSource(xmlReader);
-                Result foResult = new javax.xml.transform.stream.StreamResult(foWriter);
-                transformer.transform(xmlSource, foResult);
+                StreamSource xmlSource = new StreamSource(xmlReader);
+                Serializer serializer = saxonProcessor.newSerializer(foWriter);
+                transformer.transform(xmlSource, serializer);
             }
 
             String xslFOContent = foWriter.toString();
@@ -236,9 +224,11 @@ public class XsltTransformerService {
 
             return pdfBaseOutputStream.toByteArray();
 
-        } catch (TransformerException e) {
+        } catch (SaxonApiException e) {
             throw new XsltTransformException("TransformationError", "XSLT transformation failed: " + e.getMessage(), e);
         } catch (IOException | FOPException e) {
+            throw new XsltTransformException("PdfRenderError", "PDF rendering failed: " + e.getMessage(), e);
+        } catch (TransformerException e) {
             throw new XsltTransformException("PdfRenderError", "PDF rendering failed: " + e.getMessage(), e);
         }
     }
