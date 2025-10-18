@@ -1,6 +1,6 @@
 package com.cajuncoding.apachefop.serverless.xslt;
 
-import javax.xml.transform.Templates;
+import net.sf.saxon.s9api.XsltExecutable;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashMap;
@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 /**
- * LRU cache for compiled XSLT Templates.
+ * LRU cache for compiled XSLT Templates using Saxon-HE.
  * Thread-safe implementation using synchronized methods.
  */
 public class XsltTemplateCache {
@@ -18,11 +18,11 @@ public class XsltTemplateCache {
     private final Logger logger;
 
     private static class CacheEntry {
-        final Templates templates;
+        final XsltExecutable executable;
         long lastAccessTime;
 
-        CacheEntry(Templates templates) {
-            this.templates = templates;
+        CacheEntry(XsltExecutable executable) {
+            this.executable = executable;
             this.lastAccessTime = System.currentTimeMillis();
         }
 
@@ -66,9 +66,9 @@ public class XsltTemplateCache {
     }
 
     /**
-     * Get cached Templates or null if not found.
+     * Get cached XsltExecutable or null if not found.
      */
-    public synchronized Templates get(String cacheKey) {
+    public synchronized XsltExecutable get(String cacheKey) {
         if (!enabled) {
             return null;
         }
@@ -79,7 +79,7 @@ public class XsltTemplateCache {
             if (logger != null) {
                 logger.info("XSLT cache HIT for key: " + cacheKey.substring(0, Math.min(16, cacheKey.length())) + "...");
             }
-            return entry.templates;
+            return entry.executable;
         }
         
         if (logger != null) {
@@ -89,14 +89,14 @@ public class XsltTemplateCache {
     }
 
     /**
-     * Put compiled Templates into cache.
+     * Put compiled XsltExecutable into cache.
      */
-    public synchronized void put(String cacheKey, Templates templates) {
-        if (!enabled || templates == null) {
+    public synchronized void put(String cacheKey, XsltExecutable executable) {
+        if (!enabled || executable == null) {
             return;
         }
 
-        cache.put(cacheKey, new CacheEntry(templates));
+        cache.put(cacheKey, new CacheEntry(executable));
         if (logger != null) {
             logger.info("XSLT cached with key: " + cacheKey.substring(0, Math.min(16, cacheKey.length())) + "... (cache size: " + cache.size() + "/" + maxSize + ")");
         }
