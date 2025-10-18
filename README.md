@@ -18,6 +18,14 @@ then I do love-me-some-coffee!*
 
 ## Updates / Change Log
 
+##### Updated the project to v1.8 with the following:
+- **NEW! XSLT 2.0/3.0 Support via Saxon-HE**: Upgraded XSLT processor from Java's built-in (XSLT 1.0 only) to Saxon-HE 12.5 for full XSLT 2.0 and 3.0 support.
+  - **Saxon-HE Integration**: Open-source XSLT processor (Mozilla Public License 2.0) with XSLT 3.0, XPath 3.1, and XQuery 3.1 support.
+  - **Advanced XSLT Features**: Support for `<xsl:function>`, `<xsl:for-each-group>`, regular expressions, date/time handling, sequences, and higher-order functions.
+  - **Backwards Compatible**: Existing XSLT 1.0 stylesheets continue to work without modification.
+  - **Improved Performance**: Saxon's optimized compilation and execution engine for better performance.
+  - **Maintained Features**: All existing caching (SHA-256 hash keys, LRU eviction), security hardening, and configuration options remain unchanged.
+
 ##### Updated the project to v1.7 with the following:
 - **NEW! XML + XSLT Transformation Endpoint**: Added `/api/apache-fop/xslt` endpoint that accepts XML data and XSLT stylesheet, transforms server-side to XSL-FO, and renders to PDF.
   - **XSLT Caching**: Compiled stylesheets are cached with SHA-256 hash keys and LRU eviction for optimal performance.
@@ -99,7 +107,7 @@ If an error occurs -- likely due to incorrect Xsl-FO syntax or structure -- then
  - Request Body: **Xsl-FO Content as valid Xml** to Render
 
 #### NEW! XML + XSLT Transformation Endpoint:
-Transform XML data with XSLT stylesheet to PDF in one step! The service performs server-side XSLT transformation to XSL-FO, then renders to PDF.
+Transform XML data with XSLT stylesheet to PDF in one step! The service performs server-side XSLT transformation to XSL-FO, then renders to PDF. **Now powered by Saxon-HE for full XSLT 2.0/3.0 support!**
 
  - Path: **`/api/apache-fop/xslt`**
  - Request Type: **POST**
@@ -108,7 +116,7 @@ Transform XML data with XSLT stylesheet to PDF in one step! The service performs
    ```json
    {
      "xml": "<root>Your XML data here</root>",
-     "xslt": "<xsl:stylesheet version='1.0' ...>Your XSLT stylesheet here</xsl:stylesheet>",
+     "xslt": "<xsl:stylesheet version='2.0' ...>Your XSLT stylesheet here</xsl:stylesheet>",
      "parameters": {
        "param1": "value1",
        "param2": "value2"
@@ -117,6 +125,8 @@ Transform XML data with XSLT stylesheet to PDF in one step! The service performs
    ```
 
 **Features:**
+- **XSLT 2.0/3.0 Support**: Powered by Saxon-HE with support for advanced features like `<xsl:for-each-group>`, `<xsl:function>`, regular expressions, and more
+- **Backwards Compatible**: XSLT 1.0 stylesheets continue to work without modification
 - **XSLT Caching**: Compiled stylesheets are cached (SHA-256 hash key) with LRU eviction for optimal performance
 - **Security Hardening**: External entity resolution disabled, DTD and external stylesheet imports blocked
 - **XSLT Parameters**: Pass dynamic parameters to your stylesheets
@@ -149,7 +159,7 @@ Common error codes: `MissingBody`, `InvalidJson`, `MissingXml`, `MissingXslt`, `
 
 #### XSLT Endpoint CURL Example:
 ```bash
-# Simple XSLT transformation
+# Simple XSLT 1.0 transformation (backwards compatible)
 curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
   -H "Content-Type: application/json" \
   -H "Accept-Encoding: gzip" \
@@ -158,6 +168,15 @@ curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
     "xslt": "<?xml version=\"1.0\"?><xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:fo=\"http://www.w3.org/1999/XSL/Format\"><xsl:template match=\"/\"><fo:root><fo:layout-master-set><fo:simple-page-master master-name=\"A4\" page-width=\"210mm\" page-height=\"297mm\" margin=\"20mm\"><fo:region-body/></fo:simple-page-master></fo:layout-master-set><fo:page-sequence master-reference=\"A4\"><fo:flow flow-name=\"xsl-region-body\"><fo:block font-size=\"16pt\" font-weight=\"bold\"><xsl:value-of select=\"document/title\"/></fo:block><fo:block margin-top=\"10pt\"><xsl:value-of select=\"document/content\"/></fo:block></fo:flow></fo:page-sequence></fo:root></xsl:template></xsl:stylesheet>"
   }' \
   --output output.pdf
+
+# XSLT 2.0 transformation using for-each-group (only works with Saxon)
+curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "xml": "<?xml version=\"1.0\"?><catalog><item category=\"book\"><title>Book 1</title></item><item category=\"book\"><title>Book 2</title></item><item category=\"dvd\"><title>DVD 1</title></item></catalog>",
+    "xslt": "<?xml version=\"1.0\"?><xsl:stylesheet version=\"2.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:fo=\"http://www.w3.org/1999/XSL/Format\"><xsl:template match=\"/\"><fo:root><fo:layout-master-set><fo:simple-page-master master-name=\"A4\" page-width=\"210mm\" page-height=\"297mm\" margin=\"20mm\"><fo:region-body/></fo:simple-page-master></fo:layout-master-set><fo:page-sequence master-reference=\"A4\"><fo:flow flow-name=\"xsl-region-body\"><fo:block font-size=\"16pt\" font-weight=\"bold\">Items by Category</fo:block><xsl:for-each-group select=\"catalog/item\" group-by=\"@category\"><fo:block margin-top=\"10pt\" font-weight=\"bold\">Category: <xsl:value-of select=\"current-grouping-key()\"/></fo:block><xsl:for-each select=\"current-group()\"><fo:block margin-left=\"10pt\">- <xsl:value-of select=\"title\"/></fo:block></xsl:for-each></xsl:for-each-group></fo:flow></fo:page-sequence></fo:root></xsl:template></xsl:stylesheet>"
+  }' \
+  --output grouped-output.pdf
 
 # With XSLT parameters
 curl -X POST https://your-function-app.azurewebsites.net/api/apache-fop/xslt \
