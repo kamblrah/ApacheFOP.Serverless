@@ -93,7 +93,7 @@
                     <!-- The App Name & Resource Group Name must both be Unique or deployment issues may arise
                             as NOTED here: https://github.com/Azure/azure-functions-java-worker/issues/140 -->
                     <!-- function app name -->
-                    <appName>rvk-pdf-conv</appName>
+                    <appName>rvk-pdf-convv2</appName>
                     <resourceGroup>java-functions-group</resourceGroup>
                     <appServicePlanName>java-functions-app-service-plan</appServicePlanName>
                     <!-- function app region-->

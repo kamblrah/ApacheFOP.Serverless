@@ -73,6 +73,6 @@ jobs:
         uses: Azure/functions-action@v1
         with:
           app-name: rvk-pdf-conv
-          package: apachefop-serverless-az-func/target/azure-functions/rvk-pdf-conv
+          package: apachefop-serverless-az-func/target/azure-functions/rvk-pdf-convv2
 
 
