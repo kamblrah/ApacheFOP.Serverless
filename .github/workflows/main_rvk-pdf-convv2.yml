@@ -8,14 +8,12 @@ on:
 env:
   AZURE_FUNCTIONAPP_NAME: rvk-pdf-convv2
   POM_XML_DIRECTORY: apachefop-serverless-az-func
+  POM_FUNCTION_APP_NAME: rvk-pdf-convv2
   JAVA_VERSION: '21'
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -28,49 +26,53 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
 
       - name: Install Azure Functions Core Tools v4
         run: npm i -g azure-functions-core-tools@4 --unsafe-perm true
 
       - name: Build with Maven
         working-directory: ${{ env.POM_XML_DIRECTORY }}
-        run: |
-          mvn -B -ntp clean package || {
-            echo "Maven build had warnings, checking if artifacts were created..."
-            if [ -d "target/azure-functions" ] && [ "$(ls -A target/azure-functions)" ]; then
-              echo "Build artifacts found, continuing with deployment"
-              exit 0
-            else
-              echo "Build artifacts not found, failing build"
-              exit 1
-            fi
-          }
+        run: mvn -B -ntp clean package
 
       - name: List build output
         working-directory: ${{ env.POM_XML_DIRECTORY }}
         run: |
-          ls -la
-          ls -la target || true
+          echo "=== Build directory ==="
           ls -la target/azure-functions || true
+          echo "=== Package contents ==="
+          ls -la target/azure-functions/${{ env.POM_FUNCTION_APP_NAME }} || true
 
-      - name: Capture package path
-        id: pkg
-        working-directory: ${{ env.POM_XML_DIRECTORY }}
-        run: |
-          PKG_DIR=$(ls -d target/azure-functions/* | head -n 1)
-          echo "Detected package: $PKG_DIR"
-          echo "PKG=$PKG_DIR" >> $GITHUB_OUTPUT
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: function-app-package
+          path: ${{ env.POM_XML_DIRECTORY }}/target/azure-functions/${{ env.POM_FUNCTION_APP_NAME }}/
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: function-app-package
+          path: function-app-package
 
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_RVK_PDF_CONVV2 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_RVK_PDF_CONVV2 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_RVK_PDF_CONVV2 }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
-          app-name: rvk-pdf-convv2
-          package: apachefop-serverless-az-func/target/azure-functions/rvk-pdf-convv2
+          app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
+          package: function-app-package
