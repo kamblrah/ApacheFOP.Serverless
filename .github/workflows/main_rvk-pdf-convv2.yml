@@ -14,7 +14,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
 
     steps:
@@ -62,15 +61,9 @@ jobs:
           echo "Detected package: $PKG_DIR"
           echo "PKG=$PKG_DIR" >> $GITHUB_OUTPUT
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_A637D8580C664FAEB7036055046C58E9 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1461CCEF2FBE4FF9AC1CC75C7F78EB02 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_3D8017816E5048BFADD146FC24C10948 }}
-
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: rvk-pdf-convv2
           package: apachefop-serverless-az-func/target/azure-functions/rvk-pdf-convv2
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_CONVV2 }}
